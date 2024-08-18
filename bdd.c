@@ -233,7 +233,7 @@ int main() {
 
     // 파일 읽기
     int rows, cols;
-    const char* filename = "s3_table.txt";
+    char* filename = "s3_table.txt";
     int** truthTable = read_truth_table(filename, &rows, &cols);
     printf("truthTable done, rows: %d, cols: %d\n", rows, cols);
     BDDNode* bdd1 = build_bdd_from_truth_table(truthTable, rows, cols, terminal_0, terminal_1);
