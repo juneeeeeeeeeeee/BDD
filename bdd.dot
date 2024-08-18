@@ -1,0 +1,25 @@
+digraph BDD {
+    "00C21140" [label="a"];
+    "00C204B0" [label="b"];
+    "00C20D80" [label="c"];
+    "00C20C80" [label="d"];
+    "00C22F48" [label="0", shape=box];
+    "00C22F68" [label="1", shape=box];
+    "00C20C80" -> "00C22F48" [label="0"];
+    "00C20C80" -> "00C22F68" [label="1"];
+    "00C20D60" [label="d"];
+    "00C20D60" -> "00C22F68" [label="0"];
+    "00C20D60" -> "00C22F48" [label="1"];
+    "00C20D80" -> "00C20C80" [label="0"];
+    "00C20D80" -> "00C20D60" [label="1"];
+    "00C20DF8" [label="c"];
+    "00C20DF8" -> "00C20D60" [label="0"];
+    "00C20DF8" -> "00C20C80" [label="1"];
+    "00C204B0" -> "00C20D80" [label="0"];
+    "00C204B0" -> "00C20DF8" [label="1"];
+    "00C20E18" [label="b"];
+    "00C20E18" -> "00C20DF8" [label="0"];
+    "00C20E18" -> "00C20D80" [label="1"];
+    "00C21140" -> "00C204B0" [label="0"];
+    "00C21140" -> "00C20E18" [label="1"];
+}
