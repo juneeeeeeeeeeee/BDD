@@ -105,6 +105,7 @@ void write_bdd_to_dot(BDDNode* root1, BDDNode* root2, const char* filename) {
     fprintf(file, "digraph BDD {\n");
     write_node_and_edges(file, root1, visited, &visited_count);
     write_node_and_edges(file, root2, visited, &visited_count);
+    printf("total nodes: %d\n", visited_count);
     fprintf(file, "    node%d [label=\"%s\", style=filled, fillcolor=white, color=transparent];\n", unique_node_count, output_var[0]);
     fprintf(file, "    node%d [label=\"%s\", style=filled, fillcolor=white, color=transparent];\n", unique_node_count + 1, output_var[1]);
     fprintf(file, "    node%d -> node%d [dir=none];\n", unique_node_count, root1->index);
@@ -176,7 +177,7 @@ int** read_truth_table(const char* filename, int* rows, int* cols) {
     }
 
     // 마지막 토큰 개행 문자 제거
-    if (last_token != NULL) { 
+    if (last_token != NULL) {
         size_t len = strlen(last_token);
         if (last_token[len - 1] == '\n') {
             last_token[len - 1] = '\0';
@@ -185,16 +186,6 @@ int** read_truth_table(const char* filename, int* rows, int* cols) {
 
     output_var = (char**)realloc(output_var, sizeof(char*) * (output_count + 1));
     output_var[output_count++] = strdup(last_token);  // 문자열 복사
-    printf("Input variables:\n");
-    for (int i = 0; i < input_count; i++) {
-        printf("%s\n", input_var[i]);
-    }
-
-    // 출력 변수들 출력
-    printf("Output variables:\n");
-    for (int i = 0; i < output_count; i++) {
-        printf("%s\n", output_var[i]);
-    }
 
     int** truthTable = (int**)malloc(sizeof(int*) * 512);
     *rows = 0;
@@ -240,7 +231,7 @@ int main() {
     printf("truthTable to bdd done\n");
     BDDNode* root1 = ite(bdd1, terminal_1, terminal_0);
     printf("bdd to reduced bdd done\n");
-    
+
     // 다른 파일 읽기
     filename = "carry_table.txt";
     truthTable = read_truth_table(filename, &rows, &cols);
