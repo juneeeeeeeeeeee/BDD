@@ -4,10 +4,10 @@
 #define MAX_NODES 10000
 
 // BDD 노드 구조체 정의
-typedef struct BDDNode {
+typedef struct _BDDNode {
     int var;  // 변수 이름. 나중에 문자열로 변경됨. 
-    struct BDDNode *low;  // 0-edge
-    struct BDDNode *high; // 1-edge
+    struct _BDDNode *low;  // 0-edge
+    struct _BDDNode *high; // 1-edge
     int value;  // 단말 노드 값 (0 또는 1)
     int index;
 } BDDNode;
@@ -255,8 +255,21 @@ int main() {
     {
         free(unique_nodes[i]);
     }
+    for(int i=0;i<=rows-1;i++)
+    {
+        free(truthTable[i]);
+    }
     free(truthTable);
-
+    for(int i=0;i<=sizeof(input_var)/sizeof(char*) - 1;i++)
+    {
+        free(input_var[i]);
+    }
+    free(input_var);
+    for(int i=0;i<=sizeof(output_var)/sizeof(char*) - 1;i++)
+    {
+        free(output_var[i]);
+    }
+    free(output_var);
     // order 변경 기능 아직 안넣음
     return 0;
 }
