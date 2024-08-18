@@ -1,11 +1,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#define MAX_NODES 1000
+#define MAX_NODES 10000
 
 // BDD 노드 구조체 정의
 typedef struct BDDNode {
-    char var;  // 변수 이름
+    int var;  // 변수 이름. 나중에 문자열로 변경됨. 
     struct BDDNode *low;  // 0-edge
     struct BDDNode *high; // 1-edge
     int value;  // 단말 노드 값 (0 또는 1)
@@ -15,10 +15,13 @@ typedef struct BDDNode {
 BDDNode* unique_nodes[MAX_NODES];
 int unique_node_count = 0;
 
+char** input_var;
+char** output_var;
+
 // 새로운 단말 노드 생성
 BDDNode* create_terminal(int value) {
     BDDNode* node = (BDDNode*)malloc(sizeof(BDDNode));
-    node->var = 0;
+    node->var = -1;
     node->low = NULL;
     node->high = NULL;
     node->value = value;
@@ -28,7 +31,7 @@ BDDNode* create_terminal(int value) {
 }
 
 // 새로운 내부 노드 생성
-BDDNode* create_node(char var, BDDNode* low, BDDNode* high) {
+BDDNode* create_node(int var, BDDNode* low, BDDNode* high) {
     // 동일한 노드가 있는지 확인
     for (int i = 2; i < unique_node_count; i++) { // 0과 1은 terminal node
         if (unique_nodes[i]->var == var && unique_nodes[i]->low == low && unique_nodes[i]->high == high) {
@@ -52,9 +55,9 @@ BDDNode* ite(BDDNode* f, BDDNode* g, BDDNode* h) {
         return f->value ? g : h;
     }
     // Recursive case
-    char top_var = f->var;
-    if (g->var!=0 && g->var < top_var) top_var = g->var; // terminal 제외
-    if (h->var!=0 && h->var < top_var) top_var = h->var; // terminal 제외
+    int top_var = f->var;
+    if (g->value==-1 && g->var < top_var) top_var = g->var; // terminal 제외
+    if (h->value==-1 && h->var < top_var) top_var = h->var; // terminal 제외
     
     BDDNode* f_high = (f->var == top_var) ? f->high : f;
     BDDNode* f_low = (f->var == top_var) ? f->low : f;
@@ -69,27 +72,21 @@ BDDNode* ite(BDDNode* f, BDDNode* g, BDDNode* h) {
     return create_node(top_var, t_low, t_high);
 }
 
-void write_node_and_edges(FILE* file, BDDNode* node, int* visited, int* visited_count, int isroot) {
+void write_node_and_edges(FILE* file, BDDNode* node, int* visited, int* visited_count) {
     for (int i = 0; i < *visited_count; i++) {
         if (visited[i] == node->index) {
             return;
         }
     }
     // 현재 노드를 방문한 것으로 표시
-    visited[*visited_count] = node->index;
-    (*visited_count)++;
+    visited[(*visited_count)++] = node->index;
     if (node->value != -1) {
         fprintf(file, "    node%d [label=\"%d\", shape=box];\n", node->index, node->value);
     }
     else {
-        if(isroot == 1)
-            fprintf(file, "    node%d [label=\"%c\", fillcolor=\"yellow\", style=\"filled\"];\n", node->index, node->var);
-        else if(isroot == 2)
-            fprintf(file, "    node%d [label=\"%c\", fillcolor=\"red\", style=\"filled\"];\n", node->index, node->var);
-        else
-            fprintf(file, "    node%d [label=\"%c\"];\n", node->index, node->var);
-        write_node_and_edges(file, node->low, visited, visited_count, 0);
-        write_node_and_edges(file, node->high, visited, visited_count, 0);
+        fprintf(file, "    node%d [label=\"%s\"];\n", node->index, input_var[node->var]);
+        write_node_and_edges(file, node->low, visited, visited_count);
+        write_node_and_edges(file, node->high, visited, visited_count);
         fprintf(file, "    node%d -> node%d [label=\"0\"];\n", node->index, node->low->index);
         fprintf(file, "    node%d -> node%d [label=\"1\"];\n", node->index, node->high->index);
     }
@@ -106,8 +103,12 @@ void write_bdd_to_dot(BDDNode* root1, BDDNode* root2, const char* filename) {
     int visited[MAX_NODES];
     int visited_count = 0;
     fprintf(file, "digraph BDD {\n");
-    write_node_and_edges(file, root1, visited, &visited_count, 1); // S3
-    write_node_and_edges(file, root2, visited, &visited_count, 2); // Cout
+    write_node_and_edges(file, root1, visited, &visited_count);
+    write_node_and_edges(file, root2, visited, &visited_count);
+    fprintf(file, "    node%d [label=\"%s\", style=filled, fillcolor=white, color=transparent];\n", unique_node_count, output_var[0]);
+    fprintf(file, "    node%d [label=\"%s\", style=filled, fillcolor=white, color=transparent];\n", unique_node_count + 1, output_var[1]);
+    fprintf(file, "    node%d -> node%d [dir=none];\n", unique_node_count, root1->index);
+    fprintf(file, "    node%d -> node%d [dir=none];\n", unique_node_count + 1, root2->index);
     fprintf(file, "}\n");
     fclose(file);
 
@@ -122,19 +123,19 @@ BDDNode* build_bdd_from_truth_table(int** truthTable, int rows, int cols, BDDNod
         return NULL;
     }
 
-    BDDNode* root = create_node(0 + 65, NULL, NULL);
+    BDDNode* root = create_node(0, NULL, NULL);
 
     for (int i = 0; i < rows; i++) {
         BDDNode* current = root;
         for (int j = 0; j < cols - 2; j++) {
             if (truthTable[i][j] == 0) {
                 if (current->low == NULL) {
-                    current->low = create_node(j + 1 + 65, NULL, NULL);
+                    current->low = create_node(j + 1, NULL, NULL);
                 }
                 current = current->low;
             } else {
                 if (current->high == NULL) {
-                    current->high = create_node(j + 1 + 65, NULL, NULL);
+                    current->high = create_node(j + 1, NULL, NULL);
                 }
                 current = current->high;
             }
@@ -157,7 +158,43 @@ int** read_truth_table(const char* filename, int* rows, int* cols) {
     }
 
     char line[256];
-    fgets(line, sizeof(line), file); // 첫 줄 변수 이름 무시
+    int input_count = 0;
+    static int output_count;
+    fgets(line, sizeof(line), file);
+
+    // input, output 변수 이름 저장
+    char *token = strtok(line, " ");
+    char *last_token = NULL;
+
+    while (token != NULL) {
+        last_token = token;  // 현재 토큰을 마지막으로 기록
+        token = strtok(NULL, " ");
+        if (token != NULL) {  // 다음 토큰이 NULL이 아닌 경우 input_var에 저장
+            input_var = (char**)realloc(input_var, sizeof(char*) * (input_count + 1));
+            input_var[input_count++] = strdup(last_token);  // 문자열 복사
+        }
+    }
+
+    // 마지막 토큰 개행 문자 제거
+    if (last_token != NULL) { 
+        size_t len = strlen(last_token);
+        if (last_token[len - 1] == '\n') {
+            last_token[len - 1] = '\0';
+        }
+    }
+
+    output_var = (char**)realloc(output_var, sizeof(char*) * (output_count + 1));
+    output_var[output_count++] = strdup(last_token);  // 문자열 복사
+    printf("Input variables:\n");
+    for (int i = 0; i < input_count; i++) {
+        printf("%s\n", input_var[i]);
+    }
+
+    // 출력 변수들 출력
+    printf("Output variables:\n");
+    for (int i = 0; i < output_count; i++) {
+        printf("%s\n", output_var[i]);
+    }
 
     int** truthTable = (int**)malloc(sizeof(int*) * 512);
     *rows = 0;
@@ -218,11 +255,8 @@ int main() {
     {
         free(unique_nodes[i]);
     }
-    free(terminal_0);
-    free(terminal_1);
+    free(truthTable);
 
     // order 변경 기능 아직 안넣음
-    // text에서 식으로 변환하는 기능 아직 안넣음
-    // 진리표에서 bdd로 변환하는 기능 아직 없음
     return 0;
 }
