@@ -240,7 +240,8 @@ int main() {
     printf("truthTable to bdd done\n");
     BDDNode* root1 = ite(bdd1, terminal_1, terminal_0);
     printf("bdd to reduced bdd done\n");
-
+    
+    // 다른 파일 읽기
     filename = "carry_table.txt";
     truthTable = read_truth_table(filename, &rows, &cols);
     printf("truthTable done, rows: %d, cols: %d\n", rows, cols);
