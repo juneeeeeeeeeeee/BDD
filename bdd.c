@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #define MAX_NODES 1000
 
 // BDD 노드 구조체 정의
@@ -21,7 +22,7 @@ BDDNode* create_terminal(int value) {
     node->low = NULL;
     node->high = NULL;
     node->value = value;
-    node->index = (value) ? 1 : 0;
+    node->index = value;
     unique_nodes[unique_node_count++] = node;
     return node;
 }
@@ -68,28 +69,7 @@ BDDNode* ite(BDDNode* f, BDDNode* g, BDDNode* h) {
     return create_node(top_var, t_low, t_high);
 }
 
-// AND 연산
-BDDNode* and_op(BDDNode* f, BDDNode* g, BDDNode* terminal_0) {
-    return ite(f, g, terminal_0);
-}
-
-// OR 연산
-BDDNode* or_op(BDDNode* f, BDDNode* g, BDDNode* terminal_1) {
-    return ite(f, terminal_1, g);
-}
-
-// NOT 연산
-BDDNode* not_op(BDDNode* f, BDDNode* terminal_0, BDDNode* terminal_1) {
-    return ite(f, terminal_0, terminal_1);
-}
-
-// XOR 연산
-BDDNode* xor_op(BDDNode* f, BDDNode* g, BDDNode* terminal_0, BDDNode* terminal_1){
-    return ite(f, not_op(g, terminal_0, terminal_1), g);
-}
-
-
-void write_node_and_edges(FILE* file, BDDNode* node, int* visited, int* visited_count) {
+void write_node_and_edges(FILE* file, BDDNode* node, int* visited, int* visited_count, int isroot) {
     for (int i = 0; i < *visited_count; i++) {
         if (visited[i] == node->index) {
             return;
@@ -99,20 +79,25 @@ void write_node_and_edges(FILE* file, BDDNode* node, int* visited, int* visited_
     visited[*visited_count] = node->index;
     (*visited_count)++;
     if (node->value != -1) {
-        fprintf(file, "    \"%p\" [label=\"%d\", shape=box];\n", (void*)node, node->value);
+        fprintf(file, "    node%d [label=\"%d\", shape=box];\n", node->index, node->value);
     }
     else {
-        fprintf(file, "    \"%p\" [label=\"%c\"];\n", (void*)node, node->var);
-        write_node_and_edges(file, node->low, visited, visited_count);
-        write_node_and_edges(file, node->high, visited, visited_count);
-        fprintf(file, "    \"%p\" -> \"%p\" [label=\"0\"];\n", (void*)node, (void*)node->low);
-        fprintf(file, "    \"%p\" -> \"%p\" [label=\"1\"];\n", (void*)node, (void*)node->high);
+        if(isroot == 1)
+            fprintf(file, "    node%d [label=\"%c\", fillcolor=\"yellow\", style=\"filled\"];\n", node->index, node->var);
+        else if(isroot == 2)
+            fprintf(file, "    node%d [label=\"%c\", fillcolor=\"red\", style=\"filled\"];\n", node->index, node->var);
+        else
+            fprintf(file, "    node%d [label=\"%c\"];\n", node->index, node->var);
+        write_node_and_edges(file, node->low, visited, visited_count, 0);
+        write_node_and_edges(file, node->high, visited, visited_count, 0);
+        fprintf(file, "    node%d -> node%d [label=\"0\"];\n", node->index, node->low->index);
+        fprintf(file, "    node%d -> node%d [label=\"1\"];\n", node->index, node->high->index);
     }
 }
 
 
 // BDD를 DOT 파일로 변환하여 저장하는 함수
-void write_bdd_to_dot(BDDNode* root, const char* filename) {
+void write_bdd_to_dot(BDDNode* root1, BDDNode* root2, const char* filename) {
     FILE* file = fopen(filename, "w");
     if (!file) {
         perror("Unable to open file");
@@ -121,7 +106,8 @@ void write_bdd_to_dot(BDDNode* root, const char* filename) {
     int visited[MAX_NODES];
     int visited_count = 0;
     fprintf(file, "digraph BDD {\n");
-    write_node_and_edges(file, root, visited, &visited_count);
+    write_node_and_edges(file, root1, visited, &visited_count, 1); // S3
+    write_node_and_edges(file, root2, visited, &visited_count, 2); // Cout
     fprintf(file, "}\n");
     fclose(file);
 
@@ -130,28 +116,102 @@ void write_bdd_to_dot(BDDNode* root, const char* filename) {
     }
 }
 
+// BDD 생성 함수
+BDDNode* build_bdd_from_truth_table(int** truthTable, int rows, int cols, BDDNode* terminal_0, BDDNode* terminal_1) {
+    if (rows == 0) {
+        return NULL;
+    }
+
+    BDDNode* root = create_node(0 + 65, NULL, NULL);
+
+    for (int i = 0; i < rows; i++) {
+        BDDNode* current = root;
+        for (int j = 0; j < cols - 2; j++) {
+            if (truthTable[i][j] == 0) {
+                if (current->low == NULL) {
+                    current->low = create_node(j + 1 + 65, NULL, NULL);
+                }
+                current = current->low;
+            } else {
+                if (current->high == NULL) {
+                    current->high = create_node(j + 1 + 65, NULL, NULL);
+                }
+                current = current->high;
+            }
+        }
+        if (truthTable[i][cols-2] == 0) {
+            current->low = (truthTable[i][cols - 1] == 0) ? terminal_0 : terminal_1;
+        } else {
+            current->high = (truthTable[i][cols - 1] == 0) ? terminal_0 : terminal_1;
+        }
+    }
+    return root;
+}
+
+// 진리표 파일 읽기 함수
+int** read_truth_table(const char* filename, int* rows, int* cols) {
+    FILE* file = fopen(filename, "r");
+    if (file == NULL) {
+        perror("Failed to open file");
+        exit(EXIT_FAILURE);
+    }
+
+    char line[256];
+    fgets(line, sizeof(line), file); // 첫 줄 변수 이름 무시
+
+    int** truthTable = (int**)malloc(sizeof(int*) * 512);
+    *rows = 0;
+    *cols = 0;
+
+    while (fgets(line, sizeof(line), file)) {
+        // 줄 바꿈 문자 제거
+        line[strcspn(line, "\r\n")] = 0;
+
+        truthTable[*rows] = (int*)malloc(sizeof(int) * 10);
+        char* token = strtok(line, " ");
+        int col = 0;
+        char *endptr;
+
+        while (token != NULL) {
+            truthTable[*rows][col++] = strtol(token, &endptr, 10);
+            if (*endptr != '\0' && *endptr != '\n' && *endptr != '\r') {
+                fprintf(stderr, "Conversion error, non-convertible part: %s\n", endptr);
+                exit(EXIT_FAILURE);
+            }
+            token = strtok(NULL, " ");
+        }
+        *cols = col;
+        (*rows)++;
+    }
+
+    fclose(file);
+
+    return truthTable;
+}
+
 int main() {
     // 단말 노드 생성
     BDDNode* terminal_0 = create_terminal(0);
     BDDNode* terminal_1 = create_terminal(1);
 
-    // 변수 노드 생성
-    BDDNode* a = create_node('a', terminal_0, terminal_1);
-    BDDNode* b = create_node('b', terminal_0, terminal_1);
-    BDDNode* c = create_node('c', terminal_0, terminal_1);
-    BDDNode* d = create_node('d', terminal_0, terminal_1);
-    
-    // Boolean 함수 f(a, b, c, d) = a XOR b XOR c XOR d
-    BDDNode* f1 = xor_op(a, b, terminal_0, terminal_1);
-    BDDNode* f2 = xor_op(f1, c, terminal_0, terminal_1);
-    BDDNode* f = xor_op(f2, d, terminal_0, terminal_1);
-    // BDDNode* g = and_op(f2, d, terminal_0);
-    write_bdd_to_dot(f, "bdd.dot");
+    // 파일 읽기
+    int rows, cols;
+    const char* filename = "s3_table.txt";
+    int** truthTable = read_truth_table(filename, &rows, &cols);
+    printf("truthTable done, rows: %d, cols: %d\n", rows, cols);
+    BDDNode* bdd1 = build_bdd_from_truth_table(truthTable, rows, cols, terminal_0, terminal_1);
+    printf("truthTable to bdd done\n");
+    BDDNode* root1 = ite(bdd1, terminal_1, terminal_0);
+    printf("bdd to reduced bdd done\n");
 
-    // 결과 출력
-    printf("BDD for f(a, b, c, d) = a XOR b XOR c XOR d:\n");
-    printf("Root: %c\n", f->var);
-    printf("Low: %c, High: %c\n", f->low->var, f->high->var);
+    filename = "carry_table.txt";
+    truthTable = read_truth_table(filename, &rows, &cols);
+    printf("truthTable done, rows: %d, cols: %d\n", rows, cols);
+    BDDNode* bdd2 = build_bdd_from_truth_table(truthTable, rows, cols, terminal_0, terminal_1);
+    printf("truthTable to bdd done\n");
+    BDDNode* root2 = ite(bdd2, terminal_1, terminal_0);
+    printf("bdd to reduced bdd done\n");
+    write_bdd_to_dot(root1, root2, "bdd.dot");
 
     // 메모리 해제
     for(int i=0;i<unique_node_count;i++)
@@ -160,8 +220,6 @@ int main() {
     }
     free(terminal_0);
     free(terminal_1);
-
-    printf("umjunsik\n");
 
     // order 변경 기능 아직 안넣음
     // text에서 식으로 변환하는 기능 아직 안넣음
