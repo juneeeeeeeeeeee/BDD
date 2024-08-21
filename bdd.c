@@ -252,12 +252,12 @@ int main() {
         free(truthTable[i]);
     }
     free(truthTable);
-    for(int i=0;i<=sizeof(input_var)/sizeof(char*) - 1;i++)
+    for(int i=0;i<=cols - 1;i++)
     {
         free(input_var[i]);
     }
     free(input_var);
-    for(int i=0;i<=sizeof(output_var)/sizeof(char*) - 1;i++)
+    for(int i=0;i<=1;i++) // can be changed if output variable changes
     {
         free(output_var[i]);
     }
