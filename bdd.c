@@ -12,9 +12,11 @@ typedef struct _BDDNode {
     int index;
 } BDDNode;
 
+// unique node 저장
 BDDNode* unique_nodes[MAX_NODES];
 int unique_node_count = 0;
 
+// input 변수명 및 output 변수명 저장
 char** input_var;
 char** output_var;
 
@@ -48,7 +50,7 @@ BDDNode* create_node(int var, BDDNode* low, BDDNode* high) {
     return node;
 }
 
-// ITE 연산
+// ITE(If-Then-Else) 연산. 처음의 0 node와 1 node에서 ITE 연산을 통해 하나씩 쌓아올라간다. 
 BDDNode* ite(BDDNode* f, BDDNode* g, BDDNode* h) {
     // f가 단말 노드인 경우
     if (f->value != -1) {
@@ -72,9 +74,10 @@ BDDNode* ite(BDDNode* f, BDDNode* g, BDDNode* h) {
     return create_node(top_var, t_low, t_high);
 }
 
+// 만들어진 node와 edge를 dot 파일에 재귀적으로 출력
 void write_node_and_edges(FILE* file, BDDNode* node, int* visited, int* visited_count) {
     for (int i = 0; i < *visited_count; i++) {
-        if (visited[i] == node->index) {
+        if (visited[i] == node->index) { // 이미 방문한 적 있는 노드
             return;
         }
     }
@@ -106,6 +109,7 @@ void write_bdd_to_dot(BDDNode* root1, BDDNode* root2, const char* filename) {
     write_node_and_edges(file, root1, visited, &visited_count);
     write_node_and_edges(file, root2, visited, &visited_count);
     printf("total nodes: %d\n", visited_count);
+    // output 변수의 경우 처음 시작점을 포인팅하고 있어야 함. 
     fprintf(file, "    node%d [label=\"%s\", style=filled, fillcolor=white, color=transparent];\n", unique_node_count, output_var[0]);
     fprintf(file, "    node%d [label=\"%s\", style=filled, fillcolor=white, color=transparent];\n", unique_node_count + 1, output_var[1]);
     fprintf(file, "    node%d -> node%d [dir=none];\n", unique_node_count, root1->index);
@@ -118,7 +122,8 @@ void write_bdd_to_dot(BDDNode* root1, BDDNode* root2, const char* filename) {
     }
 }
 
-// BDD 생성 함수
+// BDD 생성 함수. 
+// credit: 조보경(@BBOK), 안성현(@54isash)
 BDDNode* build_bdd_from_truth_table(int** truthTable, int rows, int cols, BDDNode* terminal_0, BDDNode* terminal_1) {
     if (rows == 0) {
         return NULL;
